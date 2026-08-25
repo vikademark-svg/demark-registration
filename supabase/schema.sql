@@ -44,6 +44,18 @@ create table if not exists public.registrations (
   access_token     uuid not null default gen_random_uuid()
 );
 
+-- "create table if not exists" вище пропускається повністю, якщо таблиця вже
+-- існує (типовий випадок для вже запущеного проєкту) — тож нові колонки з
+-- визначення таблиці явно додаємо ще й через ALTER, інакше вони просто не
+-- з'являться в уже наявній таблиці.
+alter table public.registrations
+  add column if not exists phone_normalized text generated always as (
+    right(regexp_replace(phone, '\D', '', 'g'), 9)
+  ) stored;
+
+alter table public.registrations
+  add column if not exists access_token uuid not null default gen_random_uuid();
+
 -- Знижка одноразова на людину: другий insert з тим самим номером телефону
 -- впаде з помилкою unique_violation (код 23505) — саме на цей код орієнтується
 -- app/register/page.tsx, щоб показати "знижку вже використано" замість
