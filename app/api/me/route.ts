@@ -25,11 +25,7 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   if (regError) {
-    // Тимчасово повертаємо деталі помилки для діагностики (прибрати після).
-    return NextResponse.json(
-      { error: "lookup failed", details: regError.message, code: regError.code },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "lookup failed" }, { status: 500 });
   }
   if (!registration) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
