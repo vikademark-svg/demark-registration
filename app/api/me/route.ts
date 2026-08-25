@@ -31,17 +31,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const {
-    data: allNotifications,
-    error: notifError,
-    status: notifStatus,
-    statusText: notifStatusText,
-    count: notifCount,
-  } = await supabaseAdmin
+  const { data: allNotifications, error: notifError } = await supabaseAdmin
     .from("notifications")
-    .select("id, title, body, url, created_at, filter_city, filter_store_id, filter_age_range, filter_gender", {
-      count: "exact",
-    })
+    .select("id, title, body, url, created_at, filter_city, filter_store_id, filter_age_range, filter_gender")
     .order("created_at", { ascending: false });
 
   const notifications = (notifError ? [] : allNotifications ?? [])
@@ -71,22 +63,5 @@ export async function GET(request: NextRequest) {
       createdAt: registration.created_at,
     },
     notifications,
-    // Тимчасово, для діагностики — прибрати після виправлення.
-    debug: {
-      registrationCity: registration.city,
-      registrationStoreId: registration.store_id,
-      registrationAgeRange: registration.age_range,
-      registrationGender: registration.gender,
-      totalNotifications: allNotifications?.length ?? 0,
-      notifCount,
-      notifStatus,
-      notifStatusText,
-      notifErrorMessage: notifError?.message ?? null,
-      notifErrorDetails: notifError?.details ?? null,
-      notifErrorHint: notifError?.hint ?? null,
-      notifErrorCode: notifError?.code ?? null,
-      rawNotifications: allNotifications ?? [],
-      supabaseUrlUsed: process.env.NEXT_PUBLIC_SUPABASE_URL ?? null,
-    },
   });
 }
