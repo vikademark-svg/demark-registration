@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { STORES, findNearestStore, type Store } from "@/lib/stores";
 import { AGE_RANGES, GENDERS, type Gender } from "@/lib/options";
 import { Logo } from "@/components/Logo";
+import { ACCESS_TOKEN_STORAGE_KEY } from "@/lib/constants";
 
 const DISCOUNT_PERCENT = 10;
 
@@ -194,6 +195,10 @@ export default function RegisterPage() {
     setSubmitting(true);
     setSubmitError(null);
 
+    // Генерується на пристрої — це "ключ" до персонального кабінету /app
+    // (особисті дані + стрічка розсилок) без окремого логіну/пароля.
+    const accessToken = crypto.randomUUID();
+
     const { error } = await supabase.from("registrations").insert({
       full_name: fullName.trim(),
       phone: phone.trim(),
@@ -208,6 +213,7 @@ export default function RegisterPage() {
       age_range: ageRange,
       gender,
       user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+      access_token: accessToken,
     });
 
     setSubmitting(false);
@@ -235,6 +241,7 @@ export default function RegisterPage() {
     };
     try {
       localStorage.setItem(DISCOUNT_STORAGE_KEY, JSON.stringify(record));
+      localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
     } catch {
       // localStorage недоступний — знижка все одно покажеться для цієї сесії,
       // просто не переживе перезавантаження сторінки
@@ -293,6 +300,13 @@ export default function RegisterPage() {
               покупки.
             </p>
           </div>
+
+          <a
+            href="/app"
+            className="mt-8 block w-full border border-ink py-3 text-sm label-caps hover:bg-ink hover:text-paper transition-colors"
+          >
+            встановити застосунок і отримувати новини
+          </a>
         </div>
       </main>
     );

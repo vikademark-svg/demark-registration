@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Inter } from "next/font/google";
 import "./globals.css";
 
@@ -21,6 +21,15 @@ const body = Inter({
 export const metadata: Metadata = {
   title: "Реєстрація | DeMark",
   description: "Реєстрація відвідувачів магазинів DeMark",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "DeMark",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#434445",
 };
 
 export default function RootLayout({

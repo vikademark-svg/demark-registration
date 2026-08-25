@@ -97,6 +97,7 @@ function LoginForm() {
 }
 
 function Dashboard() {
+  const [view, setView] = useState<"registrations" | "notifications">("registrations");
   const [rows, setRows] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -200,14 +201,38 @@ function Dashboard() {
           <Logo className="h-4 w-auto text-ink mb-1" />
           <h1 className="font-display text-3xl">аудиторія</h1>
         </div>
-        <button
-          onClick={() => supabase.auth.signOut()}
-          className="text-xs label-caps border border-line px-4 py-2 hover:border-ink transition-colors"
-        >
-          вийти
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex border border-line">
+            <button
+              onClick={() => setView("registrations")}
+              className={`text-xs label-caps px-4 py-2 transition-colors ${
+                view === "registrations" ? "bg-ink text-paper" : "hover:bg-sand/50"
+              }`}
+            >
+              аудиторія
+            </button>
+            <button
+              onClick={() => setView("notifications")}
+              className={`text-xs label-caps px-4 py-2 transition-colors border-l border-line ${
+                view === "notifications" ? "bg-ink text-paper" : "hover:bg-sand/50"
+              }`}
+            >
+              розсилки
+            </button>
+          </div>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="text-xs label-caps border border-line px-4 py-2 hover:border-ink transition-colors"
+          >
+            вийти
+          </button>
+        </div>
       </div>
 
+      {view === "notifications" ? (
+        <NotificationsPanel />
+      ) : (
+        <>
       {/* Фільтри */}
       <div className="border border-line p-5 mb-6 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className="sm:col-span-2 lg:col-span-2">
@@ -354,6 +379,233 @@ function Dashboard() {
           наступна →
         </button>
       </div>
+        </>
+      )}
     </main>
+  );
+}
+
+function NotificationsPanel() {
+  const cities = Array.from(new Set(STORES.map((s) => s.city)));
+
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [url, setUrl] = useState("");
+  const [filterCity, setFilterCity] = useState("");
+  const [filterStoreId, setFilterStoreId] = useState("");
+  const [filterAgeRange, setFilterAgeRange] = useState("");
+  const [filterGender, setFilterGender] = useState("");
+
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [history, setHistory] = useState<
+    { id: string; created_at: string; title: string; body: string; sent_count: number }[]
+  >([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  const storesForFilterCity = filterCity ? STORES.filter((s) => s.city === filterCity) : STORES;
+
+  const fetchHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("id, created_at, title, body, sent_count")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (!error && data) setHistory(data);
+    setLoadingHistory(false);
+  }, []);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    setSending(true);
+    setResult(null);
+    setError(null);
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setError("Сесія закінчилась, увійдіть знову.");
+      setSending(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/send-notification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          body: body.trim(),
+          url: url.trim() || undefined,
+          filters: {
+            city: filterCity || undefined,
+            storeId: filterStoreId || undefined,
+            ageRange: filterAgeRange || undefined,
+            gender: filterGender || undefined,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Не вдалося надіслати розсилку.");
+      } else {
+        setResult(
+          `Надіслано ${data.sent} з ${data.matched} підписників${
+            data.failed ? ` (не вдалося: ${data.failed})` : ""
+          }.`
+        );
+        setTitle("");
+        setBody("");
+        setUrl("");
+        fetchHistory();
+      }
+    } catch {
+      setError("Не вдалося надіслати розсилку.");
+    }
+    setSending(false);
+  }
+
+  return (
+    <div>
+      <form onSubmit={handleSend} className="border border-line p-5 mb-6 space-y-4">
+        <div>
+          <label className="text-xs text-muted block mb-1">заголовок</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full bg-transparent border-b border-line focus:border-ink py-2 outline-none text-sm"
+            required
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted block mb-1">текст</label>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={3}
+            className="w-full bg-transparent border border-line focus:border-ink p-2 outline-none text-sm"
+            required
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted block mb-1">посилання (необов&rsquo;язково)</label>
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://demark.ua/..."
+            className="w-full bg-transparent border-b border-line focus:border-ink py-2 outline-none text-sm"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div>
+            <label className="text-xs text-muted block mb-1">місто</label>
+            <select
+              value={filterCity}
+              onChange={(e) => {
+                setFilterCity(e.target.value);
+                setFilterStoreId("");
+              }}
+              className="w-full bg-transparent border-b border-line focus:border-ink py-2 outline-none text-sm"
+            >
+              <option value="">усі</option>
+              {cities.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-muted block mb-1">магазин</label>
+            <select
+              value={filterStoreId}
+              onChange={(e) => setFilterStoreId(e.target.value)}
+              className="w-full bg-transparent border-b border-line focus:border-ink py-2 outline-none text-sm"
+            >
+              <option value="">усі</option>
+              {storesForFilterCity.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-muted block mb-1">вік</label>
+            <select
+              value={filterAgeRange}
+              onChange={(e) => setFilterAgeRange(e.target.value)}
+              className="w-full bg-transparent border-b border-line focus:border-ink py-2 outline-none text-sm"
+            >
+              <option value="">усі</option>
+              {AGE_RANGES.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-muted block mb-1">стать</label>
+            <select
+              value={filterGender}
+              onChange={(e) => setFilterGender(e.target.value)}
+              className="w-full bg-transparent border-b border-line focus:border-ink py-2 outline-none text-sm"
+            >
+              <option value="">усі</option>
+              {GENDERS.map((g) => (
+                <option key={g.value} value={g.value}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-sale">{error}</p>}
+        {result && <p className="text-sm text-success">{result}</p>}
+
+        <button
+          type="submit"
+          disabled={sending}
+          className="w-full bg-ink text-paper py-3 label-caps text-sm disabled:opacity-50 hover:opacity-90 transition-opacity"
+        >
+          {sending ? "надсилаємо…" : "надіслати розсилку"}
+        </button>
+      </form>
+
+      <p className="label-caps text-xs text-muted mb-3">історія розсилок</p>
+      <div className="border border-line divide-y divide-line">
+        {loadingHistory ? (
+          <p className="p-4 text-sm text-muted">завантаження…</p>
+        ) : history.length === 0 ? (
+          <p className="p-4 text-sm text-muted">розсилок ще не було</p>
+        ) : (
+          history.map((n) => (
+            <div key={n.id} className="p-4">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-sm font-medium">{n.title}</h3>
+                <span className="text-xs text-muted">
+                  {new Date(n.created_at).toLocaleString("uk-UA")}
+                </span>
+              </div>
+              <p className="text-sm text-muted mb-1">{n.body}</p>
+              <p className="text-xs text-muted">надіслано: {n.sent_count}</p>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }
