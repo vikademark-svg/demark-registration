@@ -6,6 +6,7 @@ import { STORES, findNearestStore, type Store } from "@/lib/stores";
 import { AGE_RANGES, GENDERS, type Gender } from "@/lib/options";
 import { Logo } from "@/components/Logo";
 import { ACCESS_TOKEN_STORAGE_KEY } from "@/lib/constants";
+import { InstallGate } from "@/components/InstallGate";
 
 const DISCOUNT_PERCENT = 10;
 
@@ -43,6 +44,14 @@ function DataRow({ label, value }: { label: string; value: string }) {
 }
 
 export default function RegisterPage() {
+  return (
+    <InstallGate>
+      <RegisterForm />
+    </InstallGate>
+  );
+}
+
+function RegisterForm() {
   const [fullName, setFullName] = useState("");
 
   const [phone, setPhone] = useState("");
@@ -305,7 +314,7 @@ export default function RegisterPage() {
             href="/app"
             className="mt-8 block w-full border border-ink py-3 text-sm label-caps hover:bg-ink hover:text-paper transition-colors"
           >
-            встановити застосунок і отримувати новини
+            мій кабінет і сповіщення про новини
           </a>
         </div>
       </main>
