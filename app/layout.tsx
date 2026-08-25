@@ -1,0 +1,34 @@
+import type { Metadata } from "next";
+import { Cormorant_Garamond, Jost } from "next/font/google";
+import "./globals.css";
+
+const display = Cormorant_Garamond({
+  subsets: ["latin", "cyrillic"],
+  weight: ["400", "500", "600"],
+  variable: "--font-display",
+});
+
+const body = Jost({
+  subsets: ["latin", "cyrillic"],
+  weight: ["300", "400", "500", "600"],
+  variable: "--font-body",
+});
+
+export const metadata: Metadata = {
+  title: "Реєстрація | DeMark",
+  description: "Реєстрація відвідувачів магазинів DeMark",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="uk">
+      <body className={`${display.variable} ${body.variable} font-body bg-paper text-ink antialiased`}>
+        {children}
+      </body>
+    </html>
+  );
+}

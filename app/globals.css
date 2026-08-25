@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+}
+
+::selection {
+  background: #141210;
+  color: #f7f4ef;
+}
+
+:focus-visible {
+  outline: 2px solid #b08d57;
+  outline-offset: 2px;
+}
+
+/* Тонка декоративна лінія-роздільник, як на сайті DeMark */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #dcd3c4 20%, #dcd3c4 80%, transparent);
+}
+
+.label-caps {
+  font-family: var(--font-body);
+  text-transform: lowercase;
+  letter-spacing: 0.18em;
+  font-weight: 500;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up {
+    animation: none;
+  }
+}
