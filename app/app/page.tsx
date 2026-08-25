@@ -57,11 +57,16 @@ export default function AppPage() {
       return;
     }
     fetch(`/api/me?token=${encodeURIComponent(token)}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("not found");
-        return res.json();
-      })
-      .then((data) => {
+      .then(async (res) => {
+        if (res.status === 404) {
+          setStatus("no-token");
+          return;
+        }
+        if (!res.ok) {
+          setStatus("error");
+          return;
+        }
+        const data = await res.json();
         setProfile(data.profile);
         setNotifications(data.notifications ?? []);
         setStatus("ready");
@@ -96,7 +101,7 @@ export default function AppPage() {
     );
   }
 
-  if (status === "no-token" || status === "error") {
+  if (status === "no-token") {
     return (
       <main className="min-h-screen flex items-center justify-center px-6">
         <div className="max-w-sm text-center animate-fade-up">
@@ -112,6 +117,28 @@ export default function AppPage() {
           >
             до реєстрації
           </a>
+        </div>
+      </main>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-6">
+        <div className="max-w-sm text-center animate-fade-up">
+          <Logo className="h-9 w-auto text-ink mx-auto mb-6" />
+          <h1 className="font-display text-3xl mb-4">не вдалося завантажити</h1>
+          <p className="text-muted mb-8">
+            Тимчасова проблема з сервером. Спробуйте оновити сторінку за хвилину — ваші
+            дані та знижка нікуди не поділись.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="block w-full border border-ink py-3 label-caps text-sm hover:bg-ink hover:text-paper transition-colors"
+          >
+            оновити
+          </button>
         </div>
       </main>
     );
