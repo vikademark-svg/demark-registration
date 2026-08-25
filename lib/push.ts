@@ -65,6 +65,25 @@ export async function subscribeToPush(accessToken: string): Promise<SubscribeRes
   }
 }
 
+/**
+ * Перевіряє, чи є вже АКТИВНА push-підписка в цьому браузері (без запиту
+ * дозволу і без реєстрації нового service worker) — викликати при
+ * завантаженні /app, щоб не показувати кнопку "увімкнути сповіщення" тому,
+ * хто вже підписаний раніше.
+ */
+export async function getExistingPushSubscription(): Promise<PushSubscription | null> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    return null;
+  }
+  try {
+    const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+    if (!registration) return null;
+    return await registration.pushManager.getSubscription();
+  } catch {
+    return null;
+  }
+}
+
 /** iOS Safari не має жодного API для програмного запуску "Додати на головний
  * екран" — це свідоме обмеження Apple. Визначаємо iOS Safari, щоб показати
  * текстову інструкцію замість (неіснуючої) кнопки встановлення. */

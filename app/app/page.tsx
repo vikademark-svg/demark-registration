@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { ACCESS_TOKEN_STORAGE_KEY } from "@/lib/constants";
-import { subscribeToPush, isIosSafari, isStandalone } from "@/lib/push";
+import { subscribeToPush, getExistingPushSubscription, isIosSafari, isStandalone } from "@/lib/push";
 import { GENDERS } from "@/lib/options";
 
 type Profile = {
@@ -46,6 +46,14 @@ export default function AppPage() {
   const [pushState, setPushState] = useState<PushState>("idle");
 
   useEffect(() => {
+    // Якщо підписка вже активна з минулого разу — одразу показуємо
+    // "✓ увімкнено", а не кнопку "увімкнути" (сама підписка на сервері
+    // не залежить від відкритої вкладки, тож жодного повторного запиту
+    // дозволу вже не потрібно).
+    getExistingPushSubscription().then((sub) => {
+      if (sub) setPushState("subscribed");
+    });
+
     let token: string | null = null;
     try {
       token = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
