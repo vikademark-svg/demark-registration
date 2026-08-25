@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { ACCESS_TOKEN_STORAGE_KEY } from "@/lib/constants";
 import { subscribeToPush, getExistingPushSubscription, isIosSafari, isStandalone } from "@/lib/push";
@@ -45,11 +45,9 @@ export default function AppPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [pushState, setPushState] = useState<PushState>("idle");
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     // Якщо підписка вже активна з минулого разу — одразу показуємо
-    // "✓ увімкнено", а не кнопку "увімкнути" (сама підписка на сервері
-    // не залежить від відкритої вкладки, тож жодного повторного запиту
-    // дозволу вже не потрібно).
+    // "✓ увімкнено", а не кнопку "увімкнути".
     getExistingPushSubscription().then((sub) => {
       if (sub) setPushState("subscribed");
     });
@@ -64,23 +62,52 @@ export default function AppPage() {
       setStatus("no-token");
       return;
     }
-    fetch(`/api/me?token=${encodeURIComponent(token)}`)
-      .then(async (res) => {
-        if (res.status === 404) {
-          setStatus("no-token");
-          return;
-        }
-        if (!res.ok) {
-          setStatus("error");
-          return;
-        }
-        const data = await res.json();
-        setProfile(data.profile);
-        setNotifications(data.notifications ?? []);
-        setStatus("ready");
-      })
-      .catch(() => setStatus("error"));
+    try {
+      const res = await fetch(`/api/me?token=${encodeURIComponent(token)}`, { cache: "no-store" });
+      if (res.status === 404) {
+        setStatus("no-token");
+        return;
+      }
+      if (!res.ok) {
+        setStatus("error");
+        return;
+      }
+      const data = await res.json();
+      setProfile(data.profile);
+      setNotifications(data.notifications ?? []);
+      setStatus("ready");
+    } catch {
+      setStatus("error");
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+
+    // iOS часто не перезавантажує встановлений PWA при поверненні зі
+    // згорнутого стану — сторінка просто "розморожується" зі старим React-
+    // станом, без повторного mount. Тому дані (особливо стрічку новин)
+    // явно оновлюємо ще й при поверненні видимості вкладки/застосунку.
+    function handleVisibility() {
+      if (document.visibilityState === "visible") {
+        loadData();
+      }
+    }
+    function handlePageShow(event: PageTransitionEvent) {
+      if (event.persisted) {
+        loadData();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("focus", loadData);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("focus", loadData);
+    };
+  }, [loadData]);
 
   async function handleEnableNotifications() {
     let token: string | null = null;
