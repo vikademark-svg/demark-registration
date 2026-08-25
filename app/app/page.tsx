@@ -44,6 +44,7 @@ export default function AppPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [pushState, setPushState] = useState<PushState>("idle");
+  const [debug, setDebug] = useState<unknown>(null);
 
   const loadData = useCallback(async () => {
     let token: string | null = null;
@@ -79,6 +80,7 @@ export default function AppPage() {
       const data = await res.json();
       setProfile(data.profile);
       setNotifications(data.notifications ?? []);
+      setDebug(data.debug ?? null);
       setStatus("ready");
     } catch {
       setStatus("error");
@@ -237,6 +239,12 @@ export default function AppPage() {
           <p className="mt-2 text-sm text-muted">Цей браузер не підтримує push-сповіщення.</p>
         )}
       </section>
+
+      {debug !== null && (
+        <pre className="mb-6 p-3 border border-sale text-[10px] leading-tight overflow-x-auto whitespace-pre-wrap break-all">
+          {JSON.stringify(debug, null, 2)}
+        </pre>
+      )}
 
       <section>
         <p className="label-caps text-xs text-muted mb-3">новини</p>

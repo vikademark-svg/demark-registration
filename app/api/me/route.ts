@@ -63,5 +63,15 @@ export async function GET(request: NextRequest) {
       createdAt: registration.created_at,
     },
     notifications,
+    // Тимчасово, для діагностики — прибрати після виправлення.
+    debug: {
+      registrationCity: registration.city,
+      registrationStoreId: registration.store_id,
+      registrationAgeRange: registration.age_range,
+      registrationGender: registration.gender,
+      totalNotifications: allNotifications?.length ?? 0,
+      notifErrorMessage: notifError?.message ?? null,
+      rawNotifications: allNotifications ?? [],
+    },
   });
 }
