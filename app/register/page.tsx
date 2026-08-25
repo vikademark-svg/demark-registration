@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { STORES, findNearestStore, type Store } from "@/lib/stores";
 import { AGE_RANGES, GENDERS, type Gender } from "@/lib/options";
@@ -10,10 +10,35 @@ const DISCOUNT_PERCENT = 10;
 
 const GEO_TOLERANCE_M = 200;
 
+// Скільки разів можна перезавантажити сторінку й досі бачити екран знижки
+// (наприклад, якщо продавець чи відвідувач випадково оновить вкладку) —
+// на (MAX_DISCOUNT_RELOADS + 1)-й раз екран знижки зникає і показується форма.
+const DISCOUNT_STORAGE_KEY = "demark_discount_v1";
+const MAX_DISCOUNT_RELOADS = 3;
+
 type GeoStatus = "idle" | "requesting" | "granted" | "denied" | "error" | "unsupported";
+
+type DiscountRecord = {
+  fullName: string;
+  phone: string;
+  city: string;
+  storeName: string;
+  ageRange: string;
+  genderLabel: string;
+  reloads: number;
+};
 
 function citiesFromStores(): string[] {
   return Array.from(new Set(STORES.map((s) => s.city)));
+}
+
+function DataRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 text-sm">
+      <span className="label-caps text-xs text-muted shrink-0">{label}</span>
+      <span className="text-ink text-right">{value}</span>
+    </div>
+  );
 }
 
 export default function RegisterPage() {
@@ -38,8 +63,29 @@ export default function RegisterPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
+  const [discountRecord, setDiscountRecord] = useState<DiscountRecord | null>(null);
   const [alreadyUsed, setAlreadyUsed] = useState(false);
+
+  // Якщо відвідувач чи продавець перезавантажить сторінку одразу після
+  // реєстрації, екран знижки не повинен просто зникнути — відновлюємо його
+  // з localStorage до MAX_DISCOUNT_RELOADS разів, далі повертаємось до форми.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DISCOUNT_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as DiscountRecord;
+      const reloads = (saved.reloads ?? 0) + 1;
+      if (reloads > MAX_DISCOUNT_RELOADS) {
+        localStorage.removeItem(DISCOUNT_STORAGE_KEY);
+        return;
+      }
+      const updated: DiscountRecord = { ...saved, reloads };
+      localStorage.setItem(DISCOUNT_STORAGE_KEY, JSON.stringify(updated));
+      setDiscountRecord(updated);
+    } catch {
+      // localStorage недоступний (приватний режим тощо) — просто показуємо форму
+    }
+  }, []);
 
   const supportsContactPicker =
     typeof navigator !== "undefined" &&
@@ -177,14 +223,30 @@ export default function RegisterPage() {
       setSubmitError("Не вдалося надіслати форму. Спробуйте ще раз.");
       return;
     }
-    setSubmitted(true);
+
+    const record: DiscountRecord = {
+      fullName: fullName.trim(),
+      phone: phone.trim(),
+      city: selectedCity,
+      storeName: selectedStore.name,
+      ageRange,
+      genderLabel: GENDERS.find((g) => g.value === gender)?.label ?? gender,
+      reloads: 0,
+    };
+    try {
+      localStorage.setItem(DISCOUNT_STORAGE_KEY, JSON.stringify(record));
+    } catch {
+      // localStorage недоступний — знижка все одно покажеться для цієї сесії,
+      // просто не переживе перезавантаження сторінки
+    }
+    setDiscountRecord(record);
   }
 
   if (alreadyUsed) {
     return (
       <main className="min-h-screen flex items-center justify-center px-6">
         <div className="max-w-md text-center animate-fade-up">
-          <p className="label-caps text-muted text-xs mb-4">demark</p>
+          <Logo className="h-9 w-auto text-ink mx-auto mb-6" />
           <h1 className="font-display text-4xl mb-4">знижку вже використано</h1>
           <p className="text-ink">
             За цим номером телефону знижку {DISCOUNT_PERCENT}% вже було надано раніше — вона
@@ -198,20 +260,35 @@ export default function RegisterPage() {
     );
   }
 
-  if (submitted) {
+  if (discountRecord) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-6">
-        <div className="max-w-md text-center animate-fade-up">
-          <p className="label-caps text-muted text-xs mb-4">demark</p>
+      <main className="min-h-screen flex items-center justify-center px-6 py-12">
+        <div className="max-w-md w-full text-center animate-fade-up">
+          <Logo className="h-9 w-auto text-ink mx-auto mb-6" />
           <h1 className="font-display text-4xl mb-4">дякуємо!</h1>
           <p className="text-muted mb-8">
-            Вашу реєстрацію отримано. До зустрічі в магазині {selectedStore?.name}, {selectedCity}.
+            Вашу реєстрацію отримано. До зустрічі в магазині {discountRecord.storeName},{" "}
+            {discountRecord.city}.
           </p>
 
-          <div className="border-2 border-sale px-6 py-8">
-            <p className="label-caps text-sale text-xs mb-2">ваша знижка</p>
-            <p className="font-display text-6xl text-sale mb-3">-{DISCOUNT_PERCENT}%</p>
-            <p className="text-sm text-ink">
+          <div className="border-2 border-sale px-6 py-8 text-left">
+            <p className="label-caps text-sale text-xs mb-2 text-center">ваша знижка</p>
+            <p className="font-display text-6xl text-sale mb-6 text-center">
+              -{DISCOUNT_PERCENT}%
+            </p>
+
+            <div className="border-t border-line pt-5 space-y-2.5">
+              <DataRow label="ім'я" value={discountRecord.fullName} />
+              <DataRow label="телефон" value={discountRecord.phone} />
+              <DataRow
+                label="магазин"
+                value={`${discountRecord.storeName}, ${discountRecord.city}`}
+              />
+              <DataRow label="вік" value={discountRecord.ageRange} />
+              <DataRow label="стать" value={discountRecord.genderLabel} />
+            </div>
+
+            <p className="text-sm text-ink text-center mt-6">
               Покажіть цей екран продавцю на касі — знижка діє одноразово для цієї
               покупки.
             </p>
@@ -224,8 +301,8 @@ export default function RegisterPage() {
   return (
     <main className="min-h-screen">
       <header className="border-b border-line">
-        <div className="max-w-xl mx-auto px-6 py-6 flex items-center justify-center">
-          <Logo className="h-6 w-auto text-ink" />
+        <div className="max-w-xl mx-auto px-6 py-7 flex items-center justify-center">
+          <Logo className="h-9 w-auto text-ink" />
         </div>
       </header>
 
