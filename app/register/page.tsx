@@ -4,6 +4,9 @@ import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { STORES, findNearestStore, type Store } from "@/lib/stores";
 import { AGE_RANGES, GENDERS, type Gender } from "@/lib/options";
+import { Logo } from "@/components/Logo";
+
+const DISCOUNT_PERCENT = 10;
 
 const GEO_TOLERANCE_M = 200;
 
@@ -36,6 +39,7 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [alreadyUsed, setAlreadyUsed] = useState(false);
 
   const supportsContactPicker =
     typeof navigator !== "undefined" &&
@@ -163,21 +167,55 @@ export default function RegisterPage() {
     setSubmitting(false);
 
     if (error) {
+      // Унікальний індекс на нормалізованому номері телефону (див.
+      // supabase/schema.sql) не дає одній людині отримати знижку двічі —
+      // Postgres повертає код 23505 (порушення unique constraint).
+      if (error.code === "23505") {
+        setAlreadyUsed(true);
+        return;
+      }
       setSubmitError("Не вдалося надіслати форму. Спробуйте ще раз.");
       return;
     }
     setSubmitted(true);
   }
 
+  if (alreadyUsed) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-6">
+        <div className="max-w-md text-center animate-fade-up">
+          <p className="label-caps text-muted text-xs mb-4">demark</p>
+          <h1 className="font-display text-4xl mb-4">знижку вже використано</h1>
+          <p className="text-ink">
+            За цим номером телефону знижку {DISCOUNT_PERCENT}% вже було надано раніше — вона
+            діє лише один раз на людину.
+          </p>
+          <div className="mt-8 border border-sale text-sale px-6 py-4">
+            <p className="label-caps text-xs">продавцю: не застосовувати знижку повторно</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   if (submitted) {
     return (
       <main className="min-h-screen flex items-center justify-center px-6">
         <div className="max-w-md text-center animate-fade-up">
-          <p className="label-caps text-clay text-xs mb-4">demark</p>
+          <p className="label-caps text-muted text-xs mb-4">demark</p>
           <h1 className="font-display text-4xl mb-4">дякуємо!</h1>
-          <p className="text-muted">
+          <p className="text-muted mb-8">
             Вашу реєстрацію отримано. До зустрічі в магазині {selectedStore?.name}, {selectedCity}.
           </p>
+
+          <div className="border-2 border-sale px-6 py-8">
+            <p className="label-caps text-sale text-xs mb-2">ваша знижка</p>
+            <p className="font-display text-6xl text-sale mb-3">-{DISCOUNT_PERCENT}%</p>
+            <p className="text-sm text-ink">
+              Покажіть цей екран продавцю на касі — знижка діє одноразово для цієї
+              покупки.
+            </p>
+          </div>
         </div>
       </main>
     );
@@ -187,13 +225,13 @@ export default function RegisterPage() {
     <main className="min-h-screen">
       <header className="border-b border-line">
         <div className="max-w-xl mx-auto px-6 py-6 flex items-center justify-center">
-          <span className="font-display text-2xl tracking-widest2">DEMARK</span>
+          <Logo className="h-6 w-auto text-ink" />
         </div>
       </header>
 
       <div className="max-w-xl mx-auto px-6 py-12">
         <div className="mb-10 animate-fade-up">
-          <p className="label-caps text-clay text-xs mb-2">реєстрація відвідувача</p>
+          <p className="label-caps text-muted text-xs mb-2">реєстрація відвідувача</p>
           <h1 className="font-display text-4xl leading-tight mb-3">
             привіт. розкажи трохи про себе
           </h1>
@@ -238,7 +276,7 @@ export default function RegisterPage() {
                   <p className="mt-3 text-lg">{phone}</p>
                 )}
                 {contactPickerError && (
-                  <p className="mt-2 text-sm text-red-700">{contactPickerError}</p>
+                  <p className="mt-2 text-sm text-sale">{contactPickerError}</p>
                 )}
               </div>
             ) : (
@@ -280,23 +318,23 @@ export default function RegisterPage() {
             )}
 
             {geoStatus === "unsupported" && (
-              <p className="text-sm text-red-700 py-2">
+              <p className="text-sm text-sale py-2">
                 Геолокація не підтримується цим браузером. Оберіть магазин вручну нижче.
               </p>
             )}
 
             {geoStatus === "denied" && geoError && (
-              <p className="text-sm text-red-700 py-2">{geoError}</p>
+              <p className="text-sm text-sale py-2">{geoError}</p>
             )}
 
             {geoStatus === "granted" && (
               <div className="mb-2">
                 {autoConfirmed ? (
-                  <p className="text-sm text-clay py-2">
+                  <p className="text-sm text-success py-2">
                     ✓ магазин визначено автоматично (похибка ≈{Math.round(nearestDistance ?? 0)} м)
                   </p>
                 ) : (
-                  <p className="text-sm text-red-700 py-2">
+                  <p className="text-sm text-sale py-2">
                     Не вдалося точно визначити магазин (найближчий — за {Math.round(nearestDistance ?? 0)} м, це
                     більше за допустиму похибку {GEO_TOLERANCE_M} м). Будь ласка, підтвердьте або оберіть магазин вручну.
                   </p>
@@ -383,12 +421,12 @@ export default function RegisterPage() {
             </div>
           </section>
 
-          {submitError && <p className="text-sm text-red-700">{submitError}</p>}
+          {submitError && <p className="text-sm text-sale">{submitError}</p>}
 
           <button
             type="submit"
             disabled={!canSubmit}
-            className="w-full bg-clay text-paper py-4 label-caps text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+            className="w-full bg-ink text-paper py-4 label-caps text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
           >
             {submitting ? "надсилаємо…" : "завершити реєстрацію"}
           </button>

@@ -5,6 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { STORES } from "@/lib/stores";
 import { AGE_RANGES, GENDERS } from "@/lib/options";
+import { Logo } from "@/components/Logo";
 
 type Registration = {
   id: string;
@@ -60,7 +61,7 @@ function LoginForm() {
   return (
     <main className="min-h-screen flex items-center justify-center px-6">
       <form onSubmit={handleLogin} className="w-full max-w-sm animate-fade-up">
-        <p className="label-caps text-clay text-xs mb-2 text-center">demark</p>
+        <Logo className="h-5 w-auto text-ink mx-auto mb-2" />
         <h1 className="font-display text-3xl mb-8 text-center">адмін-панель</h1>
 
         <label className="text-xs text-muted block mb-1">email</label>
@@ -81,7 +82,7 @@ function LoginForm() {
           required
         />
 
-        {error && <p className="text-sm text-red-700 mb-4">{error}</p>}
+        {error && <p className="text-sm text-sale mb-4">{error}</p>}
 
         <button
           type="submit"
@@ -196,7 +197,7 @@ function Dashboard() {
     <main className="min-h-screen px-6 py-8 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <p className="label-caps text-clay text-xs mb-1">demark</p>
+          <Logo className="h-4 w-auto text-ink mb-1" />
           <h1 className="font-display text-3xl">аудиторія</h1>
         </div>
         <button
@@ -294,7 +295,7 @@ function Dashboard() {
         знайдено: {totalCount} {totalCount === 1 ? "запис" : "записів"}
       </p>
 
-      {errorMsg && <p className="text-sm text-red-700 mb-4">{errorMsg}</p>}
+      {errorMsg && <p className="text-sm text-sale mb-4">{errorMsg}</p>}
 
       <div className="overflow-x-auto border border-line">
         <table className="w-full text-sm">

@@ -25,8 +25,24 @@ create table if not exists public.registrations (
   age_range        text not null check (age_range in ('16-24','25-35','36-45','46-55','56+')),
   gender           text not null check (gender in ('male','female','not_specified')),
 
-  user_agent       text
+  user_agent       text,
+
+  -- Нормалізований номер телефону: залишає лише цифри та бере останні 9
+  -- (стандартна довжина українського мобільного без коду країни), щоб
+  -- "+380501234567", "380501234567", "0501234567" й "050-123-45-67"
+  -- вважались одним і тим самим номером незалежно від формату вводу.
+  phone_normalized text generated always as (
+    right(regexp_replace(phone, '\D', '', 'g'), 9)
+  ) stored
 );
+
+-- Знижка одноразова на людину: другий insert з тим самим номером телефону
+-- впаде з помилкою unique_violation (код 23505) — саме на цей код орієнтується
+-- app/register/page.tsx, щоб показати "знижку вже використано" замість
+-- надання її вдруге. Тому у формі так важливо отримати реальний номер
+-- (через Contact Picker), а не довільний ввід.
+create unique index if not exists registrations_phone_normalized_unique_idx
+  on public.registrations (phone_normalized);
 
 create index if not exists registrations_created_at_idx on public.registrations (created_at desc);
 create index if not exists registrations_city_idx on public.registrations (city);

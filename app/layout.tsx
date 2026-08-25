@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Jost } from "next/font/google";
+import { Cormorant_Garamond, Inter } from "next/font/google";
 import "./globals.css";
 
+// Оригінальні шрифти сайту demark.ua (Kepler для заголовків, DIN Next /
+// Helvetica Neue для основного тексту) — комерційні, недоступні через Google
+// Fonts. Cormorant Garamond і Inter — найближчі безкоштовні відповідники за
+// характером (елегантний serif із засічками / нейтральний геометричний sans).
 const display = Cormorant_Garamond({
   subsets: ["latin", "cyrillic"],
   weight: ["400", "500", "600"],
   variable: "--font-display",
 });
 
-const body = Jost({
+const body = Inter({
   subsets: ["latin", "cyrillic"],
   weight: ["300", "400", "500", "600"],
   variable: "--font-body",
