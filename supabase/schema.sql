@@ -105,6 +105,12 @@ create policy "authenticated can read registrations"
 grant insert on public.registrations to anon;
 grant select on public.registrations to authenticated;
 
+-- service_role (використовується лише серверним кодом у app/api/**, ніколи
+-- в браузері) обходить RLS, але Postgres все одно вимагає базовий GRANT.
+-- У щойно створених Supabase-проєктах це зазвичай видається автоматично,
+-- але тут — так само, як з anon/authenticated вище — довелось прописати явно.
+grant all on public.registrations to service_role;
+
 -- ====================================================================
 -- Push-підписки (Web Push) — прив'язані до конкретної реєстрації.
 -- Створюються з міні-застосунку /app, коли відвідувач вмикає сповіщення.
@@ -153,6 +159,7 @@ create policy "authenticated can read push subscriptions"
 
 grant insert, update on public.push_subscriptions to anon;
 grant select on public.push_subscriptions to authenticated;
+grant all on public.push_subscriptions to service_role;
 
 -- ====================================================================
 -- Розсилки (push-кампанії), які створює й надсилає адмін з /admin.
@@ -192,6 +199,7 @@ create policy "authenticated can manage notifications"
   with check (true);
 
 grant select, insert, update on public.notifications to authenticated;
+grant all on public.notifications to service_role;
 
 -- ====================================================================
 -- Створення адміністратора:
