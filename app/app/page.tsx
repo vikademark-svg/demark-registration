@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { ACCESS_TOKEN_STORAGE_KEY } from "@/lib/constants";
-import { subscribeToPush, getExistingPushSubscription, isIosSafari, isStandalone } from "@/lib/push";
+import { subscribeToPush, resyncExistingSubscription, isIosSafari, isStandalone } from "@/lib/push";
 import { GENDERS } from "@/lib/options";
 
 type Profile = {
@@ -46,12 +46,6 @@ export default function AppPage() {
   const [pushState, setPushState] = useState<PushState>("idle");
 
   const loadData = useCallback(async () => {
-    // Якщо підписка вже активна з минулого разу — одразу показуємо
-    // "✓ увімкнено", а не кнопку "увімкнути".
-    getExistingPushSubscription().then((sub) => {
-      if (sub) setPushState("subscribed");
-    });
-
     let token: string | null = null;
     try {
       token = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
@@ -62,6 +56,16 @@ export default function AppPage() {
       setStatus("no-token");
       return;
     }
+
+    // Якщо підписка вже активна з минулого разу — одразу показуємо
+    // "✓ увімкнено" (без повторного запиту дозволу), і заодно перепрописуємо
+    // на сервері, що ця підписка належить САМЕ ПОТОЧНОМУ access_token —
+    // інакше після перевстановлення застосунку вона могла б лишитись
+    // прив'язаною до старої реєстрації з іншими даними/фільтрами.
+    resyncExistingSubscription(token).then((ok) => {
+      if (ok) setPushState("subscribed");
+    });
+
     try {
       const res = await fetch(`/api/me?token=${encodeURIComponent(token)}`, { cache: "no-store" });
       if (res.status === 404) {

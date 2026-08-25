@@ -12,6 +12,23 @@ export type SubscribeResult =
   | { ok: true }
   | { ok: false; reason: "unsupported" | "denied" | "no-vapid-key" | "error" };
 
+async function sendSubscriptionToServer(accessToken: string, subscription: PushSubscription): Promise<boolean> {
+  try {
+    const res = await fetch("/api/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: accessToken,
+        subscription: subscription.toJSON(),
+        userAgent: navigator.userAgent,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Реєструє service worker, просить дозвіл на сповіщення й підписує пристрій
  * на Web Push, після чого зберігає підписку на сервері (прив'язану до
@@ -46,23 +63,25 @@ export async function subscribeToPush(accessToken: string): Promise<SubscribeRes
       });
     }
 
-    const res = await fetch("/api/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token: accessToken,
-        subscription: subscription.toJSON(),
-        userAgent: navigator.userAgent,
-      }),
-    });
-
-    if (!res.ok) {
-      return { ok: false, reason: "error" };
-    }
-    return { ok: true };
+    const ok = await sendSubscriptionToServer(accessToken, subscription);
+    return ok ? { ok: true } : { ok: false, reason: "error" };
   } catch {
     return { ok: false, reason: "error" };
   }
+}
+
+/**
+ * Якщо в браузері вже є активна push-підписка — прив'язує її до ПОТОЧНОГО
+ * accessToken на сервері (upsert за endpoint, без запиту дозволу). Потрібно,
+ * бо підписка живе в браузері незалежно від того, який access_token зараз у
+ * localStorage: якщо людина перереєструвалась (напр. після перевстановлення
+ * застосунку) — без цього виклику в push_subscriptions лишався б старий
+ * registration_id, і фільтри розсилок звірялися б не з тим профілем.
+ */
+export async function resyncExistingSubscription(accessToken: string): Promise<boolean> {
+  const subscription = await getExistingPushSubscription();
+  if (!subscription) return false;
+  return sendSubscriptionToServer(accessToken, subscription);
 }
 
 /**
