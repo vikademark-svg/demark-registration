@@ -97,7 +97,7 @@ function LoginForm() {
 }
 
 function Dashboard() {
-  const [view, setView] = useState<"registrations" | "notifications">("registrations");
+  const [view, setView] = useState<"registrations" | "notifications" | "admins">("registrations");
   const [rows, setRows] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -219,6 +219,14 @@ function Dashboard() {
             >
               розсилки
             </button>
+            <button
+              onClick={() => setView("admins")}
+              className={`text-xs label-caps px-4 py-2 transition-colors border-l border-line ${
+                view === "admins" ? "bg-ink text-paper" : "hover:bg-sand/50"
+              }`}
+            >
+              адміни
+            </button>
           </div>
           <button
             onClick={() => supabase.auth.signOut()}
@@ -231,6 +239,8 @@ function Dashboard() {
 
       {view === "notifications" ? (
         <NotificationsPanel />
+      ) : view === "admins" ? (
+        <AdminsPanel />
       ) : (
         <>
       {/* Фільтри */}
@@ -602,6 +612,199 @@ function NotificationsPanel() {
               </div>
               <p className="text-sm text-muted mb-1">{n.body}</p>
               <p className="text-xs text-muted">надіслано: {n.sent_count}</p>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+type AdminUser = {
+  id: string;
+  email: string | null;
+  created_at: string;
+  last_sign_in_at: string | null;
+};
+
+function AdminsPanel() {
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  async function authHeader() {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : null;
+  }
+
+  const fetchAdmins = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    const headers = await authHeader();
+    if (!headers) {
+      setLoadError("Сесія закінчилась, увійдіть знову.");
+      setLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/admin/manage-admins", { headers });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoadError(data.error || "Не вдалося завантажити список адмінів.");
+      } else {
+        setAdmins(data.admins);
+      }
+    } catch {
+      setLoadError("Не вдалося завантажити список адмінів.");
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setCurrentUserId(data.session?.user.id ?? null));
+    fetchAdmins();
+  }, [fetchAdmins]);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setCreating(true);
+    setFormError(null);
+    setFormSuccess(null);
+
+    const headers = await authHeader();
+    if (!headers) {
+      setFormError("Сесія закінчилась, увійдіть знову.");
+      setCreating(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/manage-admins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFormError(data.error || "Не вдалося створити адміна.");
+      } else {
+        setFormSuccess(`Адміна ${data.admin.email} створено.`);
+        setEmail("");
+        setPassword("");
+        fetchAdmins();
+      }
+    } catch {
+      setFormError("Не вдалося створити адміна.");
+    }
+    setCreating(false);
+  }
+
+  async function handleRemove(id: string, adminEmail: string | null) {
+    if (!confirm(`Видалити доступ адміна ${adminEmail ?? id}?`)) return;
+    setRemovingId(id);
+    const headers = await authHeader();
+    if (!headers) {
+      setRemovingId(null);
+      return;
+    }
+    try {
+      const res = await fetch("/api/admin/manage-admins", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Не вдалося видалити адміна.");
+      } else {
+        setAdmins((prev) => prev.filter((a) => a.id !== id));
+      }
+    } catch {
+      alert("Не вдалося видалити адміна.");
+    }
+    setRemovingId(null);
+  }
+
+  return (
+    <div>
+      <form onSubmit={handleCreate} className="border border-line p-5 mb-6 space-y-4">
+        <p className="label-caps text-xs text-muted mb-1">додати нового адміна</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-muted block mb-1">email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-transparent border-b border-line focus:border-ink py-2 outline-none text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted block mb-1">пароль (мін. 6 символів)</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={6}
+              className="w-full bg-transparent border-b border-line focus:border-ink py-2 outline-none text-sm"
+              required
+            />
+          </div>
+        </div>
+
+        {formError && <p className="text-sm text-sale">{formError}</p>}
+        {formSuccess && <p className="text-sm text-success">{formSuccess}</p>}
+
+        <button
+          type="submit"
+          disabled={creating}
+          className="bg-ink text-paper py-3 px-6 label-caps text-sm disabled:opacity-50 hover:opacity-90 transition-opacity"
+        >
+          {creating ? "створюємо…" : "створити адміна"}
+        </button>
+      </form>
+
+      <p className="label-caps text-xs text-muted mb-3">поточні адміни</p>
+      {loadError && <p className="text-sm text-sale mb-4">{loadError}</p>}
+      <div className="border border-line divide-y divide-line">
+        {loading ? (
+          <p className="p-4 text-sm text-muted">завантаження…</p>
+        ) : admins.length === 0 ? (
+          <p className="p-4 text-sm text-muted">адмінів не знайдено</p>
+        ) : (
+          admins.map((a) => (
+            <div key={a.id} className="p-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">
+                  {a.email}
+                  {a.id === currentUserId && <span className="ml-2 text-xs text-muted">(ви)</span>}
+                </p>
+                <p className="text-xs text-muted">
+                  створено: {new Date(a.created_at).toLocaleString("uk-UA")}
+                  {a.last_sign_in_at &&
+                    ` · останній вхід: ${new Date(a.last_sign_in_at).toLocaleString("uk-UA")}`}
+                </p>
+              </div>
+              {a.id !== currentUserId && (
+                <button
+                  onClick={() => handleRemove(a.id, a.email)}
+                  disabled={removingId === a.id}
+                  className="text-xs label-caps border border-line px-3 py-2 hover:border-sale hover:text-sale transition-colors disabled:opacity-50"
+                >
+                  {removingId === a.id ? "видаляємо…" : "видалити"}
+                </button>
+              )}
             </div>
           ))
         )}
