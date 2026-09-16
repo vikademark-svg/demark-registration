@@ -7,6 +7,7 @@ import { AGE_RANGES, GENDERS, type Gender } from "@/lib/options";
 import { Logo } from "@/components/Logo";
 import { ACCESS_TOKEN_STORAGE_KEY } from "@/lib/constants";
 import { InstallGate } from "@/components/InstallGate";
+import { isValidUkrainianPhone, normalizeUkrainianPhone } from "@/lib/phone";
 
 const DISCOUNT_PERCENT = 10;
 
@@ -57,6 +58,10 @@ function RegisterForm() {
   const [phone, setPhone] = useState("");
   const [phonePicked, setPhonePicked] = useState(false);
   const [contactPickerError, setContactPickerError] = useState<string | null>(null);
+  // Навіть якщо Contact Picker API підтримується (Chrome/Edge на Android),
+  // людина може перемкнутись на звичайне поле — напр. якщо не хоче ділитись
+  // доступом до контактів, чи номера немає в книзі контактів.
+  const [manualPhoneMode, setManualPhoneMode] = useState(false);
 
   const [geoStatus, setGeoStatus] = useState<GeoStatus>("idle");
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -121,8 +126,18 @@ function RegisterForm() {
       if (contacts && contacts[0]) {
         const c = contacts[0];
         if (c.tel && c.tel[0]) {
-          setPhone(String(c.tel[0]).trim());
-          setPhonePicked(true);
+          const picked = String(c.tel[0]).trim();
+          if (!isValidUkrainianPhone(picked)) {
+            setContactPickerError(
+              "Обраний номер не схожий на український (+380…). Введіть номер вручну нижче."
+            );
+            setPhone("");
+            setPhonePicked(false);
+            setManualPhoneMode(true);
+          } else {
+            setPhone(picked);
+            setPhonePicked(true);
+          }
         } else {
           setContactPickerError("У вибраному контакті немає номера телефону.");
         }
@@ -189,9 +204,11 @@ function RegisterForm() {
     setAutoConfirmed(false);
   }
 
+  const normalizedPhone = useMemo(() => normalizeUkrainianPhone(phone), [phone]);
+
   const canSubmit =
     fullName.trim().length >= 2 &&
-    phone.trim().length >= 7 &&
+    !!normalizedPhone &&
     selectedStoreId &&
     selectedCity &&
     ageRange &&
@@ -200,7 +217,7 @@ function RegisterForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit || !selectedStore) return;
+    if (!canSubmit || !selectedStore || !normalizedPhone) return;
     setSubmitting(true);
     setSubmitError(null);
 
@@ -210,7 +227,7 @@ function RegisterForm() {
 
     const { error } = await supabase.from("registrations").insert({
       full_name: fullName.trim(),
-      phone: phone.trim(),
+      phone: normalizedPhone,
       city: selectedCity,
       store_id: selectedStore.id,
       store_name: selectedStore.name,
@@ -241,7 +258,7 @@ function RegisterForm() {
 
     const record: DiscountRecord = {
       fullName: fullName.trim(),
-      phone: phone.trim(),
+      phone: normalizedPhone,
       city: selectedCity,
       storeName: selectedStore.name,
       ageRange,
@@ -363,7 +380,7 @@ function RegisterForm() {
           <section className="animate-fade-up">
             <label className="label-caps text-xs text-muted block mb-2">номер телефону</label>
 
-            {supportsContactPicker ? (
+            {supportsContactPicker && !manualPhoneMode ? (
               <div>
                 <button
                   type="button"
@@ -378,6 +395,16 @@ function RegisterForm() {
                 {contactPickerError && (
                   <p className="mt-2 text-sm text-sale">{contactPickerError}</p>
                 )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManualPhoneMode(true);
+                    setContactPickerError(null);
+                  }}
+                  className="mt-3 text-xs text-muted underline underline-offset-2 hover:text-ink transition-colors"
+                >
+                  або ввести номер вручну
+                </button>
               </div>
             ) : (
               <div>
@@ -388,13 +415,35 @@ function RegisterForm() {
                   inputMode="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+380"
+                  placeholder="+380 XX XXX XX XX"
                   className="w-full bg-transparent border-b border-line focus:border-ink py-3 text-lg outline-none transition-colors placeholder:text-muted/60"
                   required
                 />
-                <p className="mt-2 text-xs text-muted">
-                  Вибір номера з контактів недоступний у цьому браузері — введіть його вручну.
-                </p>
+                {phone.trim() && !normalizedPhone ? (
+                  <p className="mt-2 text-xs text-sale">
+                    Приймаються лише українські номери — у форматі +380XXXXXXXXX або 0XXXXXXXXX.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-muted">
+                    {supportsContactPicker
+                      ? "Лише українські номери (+380…)."
+                      : "Вибір номера з контактів недоступний у цьому браузері — введіть його вручну. Лише українські номери (+380…)."}
+                  </p>
+                )}
+                {supportsContactPicker && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualPhoneMode(false);
+                      setPhone("");
+                      setPhonePicked(false);
+                      setContactPickerError(null);
+                    }}
+                    className="mt-2 text-xs text-muted underline underline-offset-2 hover:text-ink transition-colors"
+                  >
+                    або обрати з контактів
+                  </button>
+                )}
               </div>
             )}
           </section>
